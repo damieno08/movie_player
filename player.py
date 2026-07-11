@@ -84,7 +84,9 @@ class Video_Player(PQT.QFrame):
         def pause_movie():
             self.player.pause()
 
-            # Make sure pop-up stays open
+            # Make sure popup stays up
+            self.position_popup()
+
         pause_button.clicked.connect(pause_movie)
 
         # Add fullscreen button
@@ -110,43 +112,128 @@ class Video_Player(PQT.QFrame):
                 self.setWindowFlags(self.original_flags)
                 self.showNormal()
 
-            # Find bottom left of the window
-            global_bottom_left = self.mapToGlobal(self.rect().bottomLeft())
-            
-            # get bar height
-            bar_height = int(self.height()*0.05)
-
-            # Move into 
-            self.pop_up_bar.setGeometry(
-                global_bottom_left.x(), 
-                global_bottom_left.y() - 100, 
-                int(self.width()), 
-                bar_height
-            )
+            self.position_popup()
 
         # Add fullscreen to button
         full_screen.clicked.connect(fullscreen_movie)
 
+        # Create container for volume bar and icon
+        volume_container = PQT.QWidget()
+        volume_layout = PQT.QHBoxLayout()
+
         # Make volume bar
-        volume_bar = PQT.QSlider(Qt.Orientation.Horizontal)
+        self.volume_bar = PQT.QSlider(Qt.Orientation.Horizontal)
+
+        # Change volume bar to be small
+        self.volume_bar.setMaximumWidth(int(self.width()/2))
+
+        # Start at 100% volume
+        self.volume_bar.setValue(100)
 
         # Make bar 0-100
-        volume_bar.setMaximum(100)
-        volume_bar.setMinimum(0)
+        self.volume_bar.setMaximum(100)
+        self.volume_bar.setMinimum(0)
+
+        # Add mute/unmute button
+        self.sound_button = PQT.QPushButton()
+        self.sound_button.setIcon(QIcon("unmute.png"))
+        self.unmuted = True
+
+        def change_sound():
+            
+            # Change icon and volume based on mute or unmute
+            if self.unmuted:
+                self.sound_button.setIcon(QIcon("mute.png"))
+                self.volume_bar.setValue(0)
+                self.player.audio_set_volume(0)
+            else:
+                self.sound_button.setIcon(QIcon("unmute.png"))
+                self.volume_bar.setValue(100)
+                self.player.audio_set_volume(100)
+
+            # Toggle mute
+            self.unmuted = not self.unmuted
+
+            # Make sure popup stays open
+            self.position_popup()
+
+        # Make button alter sound
+        self.sound_button.clicked.connect(change_sound)
+
+        # Add mute/unmute
+        volume_layout.addWidget(self.sound_button)
+
+        # Add volume bar
+        volume_layout.addWidget(self.volume_bar)
+
+        # Add layout to container
+        volume_container.setLayout(volume_layout)
 
         def change_volume():
 
+            # Get volume
+            volume = self.volume_bar.value()
+
             # Set volume to selected
-            self.player.audio_set_volume(volume_bar.value())
+            self.player.audio_set_volume(volume)
+
+            # Make sure icon matches volume level
+            if volume > 0:
+                
+                self.sound_button.setIcon(QIcon("unmute.png"))
+                self.unmuted = True
+            else:
+                self.sound_button.setIcon(QIcon("mute.png"))
+                self.unmuted = False
+
+            # Change muted and unmuted
+            self.unmuted = not self.unmuted
+
+            # Make sure popup stays up
+            self.position_popup()
+
 
         # Make volume change will press or move
-        volume_bar.sliderMoved.connect(change_volume)
-        volume_bar.sliderPressed.connect(change_volume)
+        self.volume_bar.sliderMoved.connect(change_volume)
+        self.volume_bar.sliderPressed.connect(change_volume)
+
+        # Create fast forward button
+        fast_forward = PQT.QPushButton()
+        fast_forward.setIcon(QIcon("fast_forward.png"))
+        def skip_forward():
+
+            try:
+                # Skip forward 10 seconds
+                self.player.set_time(self.player.get_time()+10000)
+            except:
+                pass
+            # Make sure popup stays up
+            self.position_popup()
+
+        fast_forward.clicked.connect(skip_forward)
+
+        # Create rewind button
+        rewind = PQT.QPushButton()
+        rewind.setIcon(QIcon("rewind.png"))
+        def skip_back():
+            
+            try:
+                # Skip back 10 seconds
+                self.player.set_time(self.player.get_time()-10000)
+            except:
+                pass
+            
+            # Make sure popup stays up
+            self.position_popup()
+
+        rewind.clicked.connect(skip_back)
 
         # Add all buttons to bar
+        tools.addWidget(rewind)
         tools.addWidget(pause_button)
+        tools.addWidget(fast_forward)
+        tools.addWidget(volume_container)
         tools.addWidget(full_screen)
-        tools.addWidget(volume_bar)
 
         # Add layout of buttons to tool widget
         tool_widget.setLayout(tools)
@@ -167,6 +254,23 @@ class Video_Player(PQT.QFrame):
         self.pop_up_bar.setWidget(pop_up)
         self.pop_up_bar.setFeatures(PQT.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
 
+    def position_popup(self):
+        # Find bottom left of the window
+        global_bottom_left = self.mapToGlobal(self.rect().bottomLeft())
+        
+        # get bar height
+        bar_height = int(self.height()*0.05)
+
+        # Move into 
+        self.pop_up_bar.setGeometry(
+            global_bottom_left.x(), 
+            global_bottom_left.y() - 100, 
+            int(self.width()), 
+            bar_height
+        )
+        self.pop_up_bar.show()
+        
+
     def mousePressEvent(self, a0):
 
         # Find bottom left of the window
@@ -185,6 +289,12 @@ class Video_Player(PQT.QFrame):
         
         # Show and wait for closing
         self.pop_up_bar.show()
+        self.timer.start()
+
+    def mouseMoveEvent(self, a0):
+
+        # Show on move
+        self.position_popup()
         self.timer.start()
 
     def mouseReleaseEvent(self, a0):
@@ -270,6 +380,9 @@ class Video_Player(PQT.QFrame):
         self.progress_bar.blockSignals(False)
 
     def seek_video(self, position_ms):
+
+        # Change time and make sure popup stays open a bit more
+        self.position_popup()
         self.player.set_time(position_ms)
 
 def main():
