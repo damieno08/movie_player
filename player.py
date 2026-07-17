@@ -5,11 +5,27 @@ from PyQt6.QtGui import  QIcon
 import PyQt6.QtWidgets as PQT 
 import vlc
 import os
-        
+
+
+class MainWindow(PQT.QMainWindow):
+    def moveEvent(self, event):
+        super().moveEvent(event)
+
+        # Close any dock widgets when moving window
+        for dock in self.findChildren(PQT.QDockWidget):
+            dock.close()
+
 class VLCEventBridge(QObject):
+    """
+    Class to allow main gui to interact with VLC
+    """
     time_changed = pyqtSignal(int)
 
 class Video_Player(PQT.QFrame):
+
+    """
+    Class capable of watching movies with expected operations
+    """
 
     def __init__(self, video_path, parent=None):
 
@@ -47,7 +63,15 @@ class Video_Player(PQT.QFrame):
             self.setParent(parent)
 
         # set up the pop_up_bar
-        self.pop_up_bar = PQT.QDockWidget()
+        self.pop_up_bar = PQT.QDockWidget(self)
+
+        # Make it have white background
+        self.pop_up_bar.setStyleSheet("""
+            QWidget {
+                background-color: rgba(255, 255, 255, 150);
+                border-radius: 10px;
+            }
+        """)
 
         # Make transparent
         self.pop_up_bar.setWindowOpacity(0.5)
@@ -79,7 +103,7 @@ class Video_Player(PQT.QFrame):
         
         # Add pause button
         pause_button = PQT.QPushButton()
-        pause_button.setIcon(QIcon("pause_unpause.png"))
+        pause_button.setIcon(QIcon("icons/pause_unpause.png"))
         # Pause/resume movie
         def pause_movie():
             self.player.pause()
@@ -91,7 +115,7 @@ class Video_Player(PQT.QFrame):
 
         # Add fullscreen button
         full_screen = PQT.QPushButton()
-        full_screen.setIcon(QIcon("full_screen.jpg"))
+        full_screen.setIcon(QIcon("icons/full_screen.jpg"))
 
         # Make fullscreen seen everywhere
         global fullscreen_movie
@@ -136,18 +160,18 @@ class Video_Player(PQT.QFrame):
 
         # Add mute/unmute button
         self.sound_button = PQT.QPushButton()
-        self.sound_button.setIcon(QIcon("unmute.png"))
+        self.sound_button.setIcon(QIcon("icons/unmute.png"))
         self.unmuted = True
 
         def change_sound():
             
             # Change icon and volume based on mute or unmute
             if self.unmuted:
-                self.sound_button.setIcon(QIcon("mute.png"))
+                self.sound_button.setIcon(QIcon("icons/mute.png"))
                 self.volume_bar.setValue(0)
                 self.player.audio_set_volume(0)
             else:
-                self.sound_button.setIcon(QIcon("unmute.png"))
+                self.sound_button.setIcon(QIcon("icons/unmute.png"))
                 self.volume_bar.setValue(100)
                 self.player.audio_set_volume(100)
 
@@ -180,10 +204,10 @@ class Video_Player(PQT.QFrame):
             # Make sure icon matches volume level
             if volume > 0:
                 
-                self.sound_button.setIcon(QIcon("unmute.png"))
+                self.sound_button.setIcon(QIcon("icons/unmute.png"))
                 self.unmuted = True
             else:
-                self.sound_button.setIcon(QIcon("mute.png"))
+                self.sound_button.setIcon(QIcon("icons/mute.png"))
                 self.unmuted = False
 
             # Change muted and unmuted
@@ -199,7 +223,7 @@ class Video_Player(PQT.QFrame):
 
         # Create fast forward button
         fast_forward = PQT.QPushButton()
-        fast_forward.setIcon(QIcon("fast_forward.png"))
+        fast_forward.setIcon(QIcon("icons/fast_forward.png"))
         def skip_forward():
 
             try:
@@ -214,7 +238,7 @@ class Video_Player(PQT.QFrame):
 
         # Create rewind button
         rewind = PQT.QPushButton()
-        rewind.setIcon(QIcon("rewind.png"))
+        rewind.setIcon(QIcon("icons/rewind.png"))
         def skip_back():
             
             try:
@@ -246,6 +270,14 @@ class Video_Player(PQT.QFrame):
         pop_up_layout.addWidget(progress_widget)
         pop_up_layout.addWidget(tool_widget)
 
+        # Give pop-up white background
+        pop_up.setStyleSheet("""
+            QWidget {
+                background-color: rgba(255, 255, 255, 150);
+                border-radius: 10px;
+
+            }
+        """)
 
         # Add layout to widget
         pop_up.setLayout(pop_up_layout)
@@ -255,6 +287,10 @@ class Video_Player(PQT.QFrame):
         self.pop_up_bar.setFeatures(PQT.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
 
     def position_popup(self):
+        """
+        Function will create the popup with tools and progress bar
+        """
+
         # Find bottom left of the window
         global_bottom_left = self.mapToGlobal(self.rect().bottomLeft())
         
@@ -271,7 +307,20 @@ class Video_Player(PQT.QFrame):
         self.pop_up_bar.show()
         
 
+    def resizeEvent(self, a0):
+        """ 
+        Handle resizing
+        """
+        super().resizeEvent(a0)
+
+        # Make pop-up fit screen
+        self.position_popup()
+
     def mousePressEvent(self, a0):
+
+        """
+        Handle pop-up on click
+        """
 
         # Find bottom left of the window
         global_bottom_left = self.mapToGlobal(self.rect().bottomLeft())
@@ -292,6 +341,9 @@ class Video_Player(PQT.QFrame):
         self.timer.start()
 
     def mouseMoveEvent(self, a0):
+        """
+        Show pop-up whenever moving over screen
+        """
 
         # Show on move
         self.position_popup()
@@ -321,22 +373,22 @@ class Video_Player(PQT.QFrame):
             self.player.release()
 
         # Kill pop-up bar
-        if hasattr(self, 'pop_up_bar') and self.pop_up_bar:
-            self.pop_up_bar.close()
+        self.pop_up_bar.close()
 
         # Continue to close normally
         event.accept()
 
-    def play_video(self, video):
+    def play_video(self):
 
-        # Create play path
-        path = os.path.join(self.__video_path ,video)
+        """
+        Given a video, play it with full functionallity
+        """
 
         # Check if file exists
-        if os.path.exists(path):
+        if os.path.exists(self.__video_path):
 
             # Add video to player
-            self.player.set_mrl(path)
+            self.player.set_mrl(self.__video_path)
 
             # Start video
             self.player.play()
@@ -356,7 +408,7 @@ class Video_Player(PQT.QFrame):
 
         # What happens if no video
         else:
-
+            print(self.__video_path)
             # Say video can't be played
             PQT.QMessageBox.critical(None, "Failure", "Your video could not be found!")
 
@@ -380,6 +432,11 @@ class Video_Player(PQT.QFrame):
         self.progress_bar.blockSignals(False)
 
     def seek_video(self, position_ms):
+
+        """
+        Given a time, move to that time in the video.
+        
+        """
 
         # Change time and make sure popup stays open a bit more
         self.position_popup()
@@ -409,10 +466,10 @@ def main():
     main_window.setMouseTracking(True)
     main_window.show()
 
-    window.play_video("Obsession.2025.1080p.Bluray.10Bit.AAC7.1.x265-NeoNoir.mkv")
+    #window.play_video("Obsession.2025.1080p.Bluray.10Bit.AAC7.1.x265-NeoNoir.mkv")
 
 
     app.exec()
 
-
-main()
+if __name__ == "__main__": 
+    main()
